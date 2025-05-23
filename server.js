@@ -9,7 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({
-  origin: 'https://348b238c-180f-4111-994a-5cd53d6e50db.filesusr.com'
+  origin: 'https://348b238c-180f-4111-994a-5cd53d6e50db.filesusr.com',
   methods: ['POST', 'GET'],
   allowedHeaders: ['Content-Type']
 }));
