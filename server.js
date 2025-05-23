@@ -3,11 +3,11 @@ const multer = require("multer");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
 const fs = require("fs");
-const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Activer CORS
 app.use(cors({
   origin: 'https://348b238c-180f-4111-994a-5cd53d6e50db.filesusr.com',
   methods: ['POST', 'GET'],
@@ -17,10 +17,10 @@ app.use(cors({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Multer config
+// Multer : fichiers max 10 Mo, bloquer les extensions dangereuses
 const upload = multer({
   dest: "uploads/",
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 Mo
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const forbidden = /\.(exe|bat|sh|cmd|js)$/i;
     if (forbidden.test(file.originalname)) {
@@ -30,7 +30,7 @@ const upload = multer({
   }
 });
 
-// Nodemailer config
+// SMTP transport
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
@@ -41,24 +41,41 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Génération du HTML de l'e-mail
+// Formate les données dans un tableau HTML clair
 function generateHtml(data) {
+  const labels = {
+    email: "Adresse e-mail",
+    fournisseur: "Fournisseur de Réappro",
+    ean: "EAN",
+    cai: "CAI",
+    adherence: "Adhérence sol mouillé",
+    conso: "Consommation carburant",
+    sonore: "Niveau sonore",
+    classe: "Classe de performance",
+    designation: "Désignation Pneu",
+    prixBF: "Prix BF",
+    prixAchat: "Prix d'achat"
+  };
+
+  const rows = Object.entries(labels).map(([key, label]) => `
+    <tr>
+      <td style="padding:8px; border:1px solid #ccc; font-weight:bold; background:#f8f8f8;">${label}</td>
+      <td style="padding:8px; border:1px solid #ccc;">${data[key] || '<em>(non renseigné)</em>'}</td>
+    </tr>
+  `).join("");
+
   return `
-    <div style="font-family:Arial; padding:20px;">
-      <h2 style="color:#007bff;">📝 Nouveau formulaire reçu</h2>
-      <table style="border-collapse:collapse; width:100%;">
-        ${Object.entries(data).map(([key, value]) => `
-          <tr>
-            <td style="padding:8px; font-weight:bold;">${key.replace(/([A-Z])/g, ' $1')}:</td>
-            <td style="padding:8px;">${value}</td>
-          </tr>`).join('')}
+    <div style="font-family:Arial,sans-serif; max-width:700px; margin:auto;">
+      <h2 style="color:#007bff; text-align:center;">📩 Formulaire Pneus</h2>
+      <table style="width:100%; border-collapse:collapse; margin-top:20px;">
+        ${rows}
       </table>
-      <p style="margin-top:20px;">📎 Des fichiers sont joints à ce message si fournis.</p>
+      <p style="margin-top:20px;">📎 Fichiers joints inclus si ajoutés dans le formulaire.</p>
     </div>
   `;
 }
 
-// Route POST
+// Route principale POST
 app.post("/submit-form", upload.array("fichiers[]"), async (req, res) => {
   const formData = req.body;
   const attachments = req.files.map(file => ({
@@ -67,27 +84,27 @@ app.post("/submit-form", upload.array("fichiers[]"), async (req, res) => {
   }));
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: process.env.EMAIL_TO,
-    subject: "📩 Nouveau formulaire pneus",
+    from: `"Formulaire création" <${process.env.EMAIL_USER}>`,
+    to: process.env.DEST_EMAIL,
+    subject: "🧾Nouveau formulaire Pneumatique",
     html: generateHtml(formData),
     attachments
   };
 
   try {
     await transporter.sendMail(mailOptions);
-    req.files.forEach(file => fs.unlink(file.path, () => {})); // supprimer fichiers temporaires
-    res.status(200).send("Email envoyé !");
+    req.files.forEach(file => fs.unlink(file.path, () => {})); // nettoyage
+    res.status(200).send("Formulaire envoyé !");
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Erreur lors de l'envoi de l'e-mail.");
+    console.error("Erreur :", err);
+    res.status(500).send("Erreur serveur");
   }
 });
 
 app.get("/", (req, res) => {
-  res.send("Serveur en ligne !");
+  res.send("✅ Serveur en ligne pour formulaire pneus !");
 });
 
 app.listen(PORT, () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
+  console.log(`✅ Serveur lancé sur le port ${PORT}`);
 });
